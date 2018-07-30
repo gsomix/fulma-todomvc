@@ -1,3 +1,6 @@
+source https://www.nuget.org/api/v2
+
+nuget Fulma.Extensions
 group Server
     storage: none
     source https://api.nuget.org/v3/index.json
@@ -28,4 +31,3 @@ group Build
     nuget Fake.Core.Target
     nuget Fake.DotNet.Cli
     nuget Fake.IO.FileSystem
-

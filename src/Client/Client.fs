@@ -5,103 +5,69 @@ open Elmish.React
 
 open Fable.Helpers.React
 open Fable.Helpers.React.Props
-open Fable.PowerPack.Fetch
 
 open Shared
 
 open Fulma
+open Fulma.Extensions
 
+let [<Literal>] ENTER_KEY = 13.
 
-// The model holds data that you want to keep track of while the application is running
-// in this case, we are keeping track of a counter
-// we mark it as optional, because initially it will not be available from the client
-// the initial value will be requested from server
-type Model = { Counter: Counter option }
+type Model = { 
+    TodoItems: list<Todo> 
+    NewTodoDescription: string
+}
 
-// The Msg type defines what events/actions can occur while the application is running
-// the state of the application changes *only* in reaction to these events
 type Msg =
-| Increment
-| Decrement
-| InitialCountLoaded of Result<Counter, exn>
+    | AddTodo
+    | EditNewTodoDescription of string
 
-
-
-// defines the initial state and initial command (= side-effect) of the application
 let init () : Model * Cmd<Msg> =
-    let initialModel = { Counter = None }
-    let loadCountCmd =
-        Cmd.ofPromise
-            (fetchAs<int> "/api/init")
-            []
-            (Ok >> InitialCountLoaded)
-            (Error >> InitialCountLoaded)
-    initialModel, loadCountCmd
+    let initialModel = 
+        { TodoItems = []
+          NewTodoDescription = "" }
 
-// The update function computes the next state of the application based on the current state and the incoming events/messages
-// It can also run side-effects (encoded as commands) like calling the server via Http.
-// these commands in turn, can dispatch messages to which the update function will react.
+    initialModel, Cmd.none
+
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
-    match currentModel.Counter, msg with
-    | Some x, Increment ->
-        let nextModel = { currentModel with Counter = Some (x + 1) }
-        nextModel, Cmd.none
-    | Some x, Decrement ->
-        let nextModel = { currentModel with Counter = Some (x - 1) }
-        nextModel, Cmd.none
-    | _, InitialCountLoaded (Ok initialCount)->
-        let nextModel = { Counter = Some initialCount }
-        nextModel, Cmd.none
+    match msg with
+    | EditNewTodoDescription str ->
+        let newModel = { currentModel with NewTodoDescription = str }
+        newModel, Cmd.none
+        
+    | AddTodo -> 
+        let newItem = 
+            { Description = currentModel.NewTodoDescription
+              Completed = false }
 
-    | _ -> currentModel, Cmd.none
+        let newModel =
+            { currentModel with 
+                TodoItems = newItem :: currentModel.TodoItems
+                NewTodoDescription = "" }
 
+        newModel , Cmd.none
 
-let safeComponents =
-    let components =
-        span [ ]
-           [
-             a [ Href "https://github.com/giraffe-fsharp/Giraffe" ] [ str "Giraffe" ]
-             str ", "
-             a [ Href "http://fable.io" ] [ str "Fable" ]
-             str ", "
-             a [ Href "https://elmish.github.io/elmish/" ] [ str "Elmish" ]
-             str ", "
-             a [ Href "https://mangelmaxime.github.io/Fulma" ] [ str "Fulma" ]
-           ]
+let showItems (items: list<Todo>) =
+    [ for item in items -> 
+        Panel.block [ ] 
+            [ Checkradio.checkbox [ Checkradio.Checked item.Completed ] [ str item.Description ] ] ]
 
-    p [ ]
-        [ strong [] [ str "SAFE Template" ]
-          str " powered by: "
-          components ]
-
-let show = function
-| { Counter = Some x } -> string x
-| { Counter = None   } -> "Loading..."
-
-let button txt onClick =
-    Button.button
-        [ Button.IsFullWidth
-          Button.Color IsPrimary
-          Button.OnClick onClick ]
-        [ str txt ]
-
-let view (model : Model) (dispatch : Msg -> unit) =
-    div []
-        [ Navbar.navbar [ Navbar.Color IsPrimary ]
-            [ Navbar.Item.div [ ]
-                [ Heading.h2 [ ]
-                    [ str "SAFE Template" ] ] ]
-
-          Container.container []
-              [ Content.content [ Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ]
-                    [ Heading.h3 [] [ str ("Press buttons to manipulate counter: " + show model) ] ]
-                Columns.columns []
-                    [ Column.column [] [ button "-" (fun _ -> dispatch Decrement) ]
-                      Column.column [] [ button "+" (fun _ -> dispatch Increment) ] ] ]
-
-          Footer.footer [ ]
-                [ Content.content [ Content.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ]
-                    [ safeComponents ] ] ]
+let view (model: Model) (dispatch: Msg -> unit) =
+    Columns.columns [ ]
+        [ Column.column [ Column.Offset (Screen.All, Column.Is3)
+                          Column.Width  (Screen.All, Column.Is6) ] 
+            [ Panel.panel [ ] 
+                [ yield Panel.heading [ ] [ str "todos" ] 
+                  yield Panel.block [ ] 
+                    [ Control.div [ ] 
+                        [ Input.text 
+                            [ Input.Placeholder "What needs to be done?"
+                              Input.Value model.NewTodoDescription 
+                              Input.Props 
+                                [ OnInput (fun e -> dispatch <| EditNewTodoDescription e.Value) 
+                                  OnKeyDown (fun e -> if e.which = ENTER_KEY then dispatch <| AddTodo) ] ] ] ] 
+                  yield! showItems (model.TodoItems)
+                  yield Panel.block [ ] [ str (sprintf "%d items left" model.TodoItems.Length) ] ] ] ]
 
 
 #if DEBUG
