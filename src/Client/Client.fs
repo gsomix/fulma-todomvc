@@ -21,6 +21,7 @@ type Model = {
 
 type Msg =
     | AddTodo
+    | DeleteTodo of Id
     | EditNewTodoDescription of string
     | ToggleCompleted of Id
 
@@ -57,15 +58,29 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             { currentModel with 
                 TodoItems = currentModel.TodoItems |> Map.add id newItem }
         newModel, Cmd.none
+
+    | DeleteTodo id -> 
+        let newModel = 
+            { currentModel with 
+                TodoItems = currentModel.TodoItems |> Map.remove id }
+        newModel, Cmd.none
         
 
 let showItems (items: Map<Id, Todo>) (dispatch: Msg -> unit) =
     [ for KeyValue(id, item) in items -> 
         Panel.block [ ] 
-            [ Checkradio.checkbox // TODO Fix styling
-                [ Checkradio.Checked item.Completed 
-                  Checkradio.OnChange (fun _ -> dispatch <| ToggleCompleted id)] 
-                [ str item.Description ] ] ]
+            [ Level.level [ ]
+                [ Level.left [ ] 
+                    [ Level.item [ ] 
+                        [ Checkradio.checkbox // TODO Fix styling
+                            [ Checkradio.Checked item.Completed 
+                              Checkradio.OnChange (fun _ -> dispatch <| ToggleCompleted id)] 
+                            [ str item.Description ] ] ]
+                  Level.right [ ] 
+                    [ Level.item [ ] 
+                        [ Delete.delete 
+                            [ Delete.OnClick (fun _ -> dispatch <| DeleteTodo id) ] [ ] ] ]
+                ] ] ]
 
 let countActive (items: Map<Id, Todo>) =
     items
