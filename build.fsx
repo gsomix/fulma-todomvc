@@ -1,116 +1,60 @@
-#r "paket: groupref build //"
-#load "./.fake/build.fsx/intellisense.fsx"
+#r "paket: groupref netcorebuild //"
+#load ".fake/build.fsx/intellisense.fsx"
 
-#if !FAKE
-#r "netstandard"
-#r "Facades/netstandard" // https://github.com/ionide/ionide-vscode-fsharp/issues/839#issuecomment-396296095
-#endif
-
-open System
+#nowarn "52"
 
 open Fake.Core
+open Fake.Core.TargetOperators
 open Fake.DotNet
 open Fake.IO
-
-let serverPath = Path.getFullName "./src/Server"
-let clientPath = Path.getFullName "./src/Client"
-let deployDir = Path.getFullName "./deploy"
-
-let platformTool tool winTool =
-    let tool = if Environment.isUnix then tool else winTool
-    match Process.tryFindFileOnPath tool with
-    | Some t -> t
-    | _ ->
-        let errorMsg =
-            tool + " was not found in path. " +
-            "Please install it and make sure it's available from your path. " +
-            "See https://safe-stack.github.io/docs/quickstart/#install-pre-requisites for more info"
-        failwith errorMsg
-
-let nodeTool = platformTool "node" "node.exe"
-let yarnTool = platformTool "yarn" "yarn.cmd"
-
-let install = lazy DotNet.install DotNet.Versions.Release_2_1_300
-
-let inline withWorkDir wd =
-    DotNet.Options.lift install.Value
-    >> DotNet.Options.withWorkingDirectory wd
-
-let runTool cmd args workingDir =
-    let result =
-        Process.execSimple (fun info ->
-            { info with
-                FileName = cmd
-                WorkingDirectory = workingDir
-                Arguments = args })
-            TimeSpan.MaxValue
-    if result <> 0 then failwithf "'%s %s' failed" cmd args
-
-let runDotNet cmd workingDir =
-    let result =
-        DotNet.exec (withWorkDir workingDir) cmd ""
-    if result.ExitCode <> 0 then failwithf "'dotnet %s' failed in %s" cmd workingDir
-
-let openBrowser url =
-    let result =
-        //https://github.com/dotnet/corefx/issues/10361
-        Process.execSimple (fun info ->
-            { info with
-                FileName = url
-                UseShellExecute = true })
-            TimeSpan.MaxValue
-    if result <> 0 then failwithf "opening browser failed"
+open Fake.IO.Globbing.Operators
+open Fake.JavaScript
 
 Target.create "Clean" (fun _ ->
-    Shell.cleanDirs [deployDir]
+    !! "src/bin"
+    ++ "src/obj"
+    ++ "output"
+    |> Seq.iter Shell.cleanDir
 )
 
-Target.create "InstallClient" (fun _ ->
-    printfn "Node version:"
-    runTool nodeTool "--version" __SOURCE_DIRECTORY__
-    printfn "Yarn version:"
-    runTool yarnTool "--version" __SOURCE_DIRECTORY__
-    runTool yarnTool "install --frozen-lockfile" __SOURCE_DIRECTORY__
-    runDotNet "restore" clientPath
+Target.create "Install" (fun _ ->
+    DotNet.restore
+        (DotNet.Options.withWorkingDirectory __SOURCE_DIRECTORY__)
+        "todo-list.sln"
 )
 
-Target.create "RestoreServer" (fun _ ->
-    runDotNet "restore" serverPath
+Target.create "YarnInstall" (fun _ ->
+    Yarn.install id
 )
 
 Target.create "Build" (fun _ ->
-    runDotNet "build" serverPath
-    runDotNet "fable webpack -- -p" clientPath
+    let result =
+        DotNet.exec
+            (DotNet.Options.withWorkingDirectory __SOURCE_DIRECTORY__)
+            "fable"
+            "webpack --port free -- -p"
+
+    if not result.OK then failwithf "dotnet fable failed with code %i" result.ExitCode
 )
 
-Target.create "Run" (fun _ ->
-    let server = async {
-        runDotNet "watch run" serverPath
-    }
-    let client = async {
-        runDotNet "fable webpack-dev-server" clientPath
-    }
-    let browser = async {
-        do! Async.Sleep 5000
-        openBrowser "http://localhost:8080"
-    }
+Target.create "Watch" (fun _ ->
+    let result =
+        DotNet.exec
+            (DotNet.Options.withWorkingDirectory __SOURCE_DIRECTORY__)
+            "fable"
+            "webpack-dev-server --port free"
 
-    [ server; client; browser ]
-    |> Async.Parallel
-    |> Async.RunSynchronously
-    |> ignore
+    if not result.OK then failwithf "dotnet fable failed with code %i" result.ExitCode
 )
 
-
-open Fake.Core.TargetOperators
-
+// Build order
 "Clean"
-    ==> "InstallClient"
+    ==> "Install"
+    ==> "YarnInstall"
     ==> "Build"
 
-"Clean"
-    ==> "InstallClient"
-    ==> "RestoreServer"
-    ==> "Run"
+"Watch"
+    <== [ "YarnInstall" ]
 
+// start build
 Target.runOrDefault "Build"

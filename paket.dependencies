@@ -1,33 +1,32 @@
 source https://www.nuget.org/api/v2
+storage:none
+framework: netstandard2.0
 
+nuget FSharp.Core redirects:force
+nuget Fable.Core
+nuget Fable.Elmish
+nuget Fable.Elmish.React
+nuget Fable.Elmish.Browser
+nuget Fable.Elmish.Debugger
+nuget Fable.Elmish.HMR
+nuget Fable.React
+nuget Fulma prerelease
 nuget Fulma.Extensions
-group Server
-    storage: none
-    source https://api.nuget.org/v3/index.json
 
-    nuget FSharp.Core
-    nuget Giraffe ~> 1
-    nuget Microsoft.AspNetCore
-    nuget Microsoft.AspNetCore.StaticFiles
-    nuget Fable.JsonConverter
+group netcorebuild
+    storage:none
+    source https://www.nuget.org/api/v2
+    framework: netstandard2.0
 
-group Client
-    storage: none
-    source https://api.nuget.org/v3/index.json
-
-    nuget Fable.Core
-    nuget Fable.Elmish.Debugger
-    nuget Fable.Elmish.React
-    nuget Fable.Elmish.HMR
-    nuget Fulma
-
+    clitool dotnet-fake
     clitool dotnet-fable
-
-group Build
-    storage: none
-    source https://api.nuget.org/v3/index.json
-
-    nuget FSharp.Core 4.3.4 // https://github.com/fsharp/FAKE/issues/2001
-    nuget Fake.Core.Target
+    nuget NETStandard.Library.NETFramework
     nuget Fake.DotNet.Cli
+    nuget Fake.DotNet.Paket
+    nuget Fake.Core.Target
+    nuget Fake.Core.Process
+    nuget Fake.Core.String
+    nuget Fake.Core.ReleaseNotes
     nuget Fake.IO.FileSystem
+    nuget Fake.Tools.Git
+    nuget Fake.JavaScript.Yarn

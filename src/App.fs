@@ -1,4 +1,4 @@
-module Client
+module App.View
 
 open Elmish
 open Elmish.React
@@ -15,8 +15,8 @@ let [<Literal>] ENTER_KEY = 13.
 
 type Tab = | All | Active | Completed
 
-type Model = { 
-    TodoItems: Map<Id, Todo> 
+type Model = {
+    TodoItems: Map<Id, Todo>
     NewTodoDescription: string
     LastId: Id
     ActiveTab: Tab
@@ -31,9 +31,9 @@ type Msg =
     | ClearCompleted
 
 let init () : Model * Cmd<Msg> =
-    let initialModel = 
+    let initialModel =
         { TodoItems = Map.empty
-          NewTodoDescription = "" 
+          NewTodoDescription = ""
           LastId = 0
           ActiveTab = All }
     initialModel, Cmd.none
@@ -41,60 +41,60 @@ let init () : Model * Cmd<Msg> =
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
     | EditNewTodoDescription str ->
-        let newModel = { currentModel with NewTodoDescription = str }        
+        let newModel = { currentModel with NewTodoDescription = str }
         newModel, Cmd.none
-        
-    | AddTodo -> 
-        let newId = currentModel.LastId + 1 // TODO Move computation to Id type 
-        let newItem = 
+
+    | AddTodo ->
+        let newId = currentModel.LastId + 1 // TODO Move computation to Id type
+        let newItem =
             { Todo.Empty with
-                Id = newId 
+                Id = newId
                 Description = currentModel.NewTodoDescription }
         let newModel =
-            { currentModel with 
+            { currentModel with
                 TodoItems = currentModel.TodoItems |> Map.add newId newItem
                 NewTodoDescription = ""
                 LastId = newId }
         newModel , Cmd.none
 
-    | ToggleCompleted id -> 
+    | ToggleCompleted id ->
         let item = Map.find id currentModel.TodoItems
         let newItem = { item with Completed = not item.Completed }
-        let newModel = 
-            { currentModel with 
+        let newModel =
+            { currentModel with
                 TodoItems = currentModel.TodoItems |> Map.add id newItem }
         newModel, Cmd.none
 
-    | DeleteTodo id -> 
-        let newModel = 
-            { currentModel with 
+    | DeleteTodo id ->
+        let newModel =
+            { currentModel with
                 TodoItems = currentModel.TodoItems |> Map.remove id }
         newModel, Cmd.none
 
-    | SetActiveTab tab -> 
+    | SetActiveTab tab ->
         let newModel = { currentModel with ActiveTab = tab }
         newModel, Cmd.none
 
-    | ClearCompleted -> 
-        let newItems = 
+    | ClearCompleted ->
+        let newItems =
             currentModel.TodoItems |> Map.filter (fun _ v -> not v.Completed)
-        let newModel = 
+        let newModel =
             { currentModel with TodoItems = newItems }
-        newModel, Cmd.none     
+        newModel, Cmd.none
 
 let showItems (items: Map<Id, Todo>) (dispatch: Msg -> unit) =
-    [ for KeyValue(id, item) in items -> 
-        Panel.block [ ] 
+    [ for KeyValue(id, item) in items ->
+        Panel.block [ ]
             [ Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ] // TODO Use columns instead?
-                [ Level.left [ ] 
-                    [ Level.item [ ] 
+                [ Level.left [ ]
+                    [ Level.item [ ]
                         [ Checkradio.checkbox // TODO Fix styling
-                            [ Checkradio.Checked item.Completed 
-                              Checkradio.OnChange (fun _ -> dispatch <| ToggleCompleted id)] 
+                            [ Checkradio.Checked item.Completed
+                              Checkradio.OnChange (fun _ -> dispatch <| ToggleCompleted id)]
                             [ str item.Description ] ] ]
-                  Level.right [ ] 
-                    [ Level.item [ ] 
-                        [ Delete.delete 
+                  Level.right [ ]
+                    [ Level.item [ ]
+                        [ Delete.delete
                             [ Delete.OnClick (fun _ -> dispatch <| DeleteTodo id) ] [ ] ] ]
                 ] ] ]
 
@@ -110,9 +110,9 @@ let countActive (items: Map<Id, Todo>) =
     |> Map.count
 
 let showTab (tab: Tab) (activeTab: Tab) (dispatch: Msg -> unit) =
-    Panel.tab 
+    Panel.tab
         [ Panel.Tab.IsActive (activeTab = tab)
-          Panel.Tab.Props [ OnClick (fun _ -> dispatch <| SetActiveTab tab) ] ] 
+          Panel.Tab.Props [ OnClick (fun _ -> dispatch <| SetActiveTab tab) ] ]
         [ str (sprintf "%A" tab) ]
 
 let view (model: Model) (dispatch: Msg -> unit) =
@@ -120,43 +120,40 @@ let view (model: Model) (dispatch: Msg -> unit) =
 
     Columns.columns [ ]
         [ Column.column [ Column.Offset (Screen.All, Column.Is3)
-                          Column.Width  (Screen.All, Column.Is6) ] 
-            [ Panel.panel [ ] 
-                [ yield Panel.heading [ ] [ str "Todos" ] 
-                  yield Panel.block [ ] 
-                    [ Control.div [ ] 
-                        [ Input.text 
+                          Column.Width  (Screen.All, Column.Is6) ]
+            [ Panel.panel [ ]
+                [ yield Panel.heading [ ] [ str "Todos" ]
+                  yield Panel.block [ ]
+                    [ Control.div [ ]
+                        [ Input.text
                             [ Input.Placeholder "What needs to be done?"
-                              Input.Value model.NewTodoDescription 
-                              Input.Props 
-                                [ OnInput (fun e -> dispatch <| EditNewTodoDescription e.Value) 
-                                  OnKeyDown (fun e -> if e.which = ENTER_KEY then dispatch <| AddTodo) ] ] ] ] 
+                              Input.Value model.NewTodoDescription
+                              Input.Props
+                                [ OnInput (fun e -> dispatch <| EditNewTodoDescription e.Value)
+                                  OnKeyDown (fun e -> if e.which = ENTER_KEY then dispatch <| AddTodo) ] ] ] ]
                   yield Panel.tabs [ ] // TODO Move to component
                     [ showTab All model.ActiveTab dispatch
                       showTab Active model.ActiveTab dispatch
                       showTab Completed model.ActiveTab dispatch ] // TODO Fix code duplication
                   yield! showItems filtered dispatch
-                  yield Panel.block [ ] 
+                  yield Panel.block [ ]
                     [ Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ]
-                        [ Level.left [ ] 
+                        [ Level.left [ ]
                             [ str (sprintf "%d items left" (countActive model.TodoItems)) ]
-                          Level.right [ ] 
-                            [ Button.button 
-                                [ Button.OnClick (fun _ -> dispatch <| ClearCompleted) ] 
+                          Level.right [ ]
+                            [ Button.button
+                                [ Button.OnClick (fun _ -> dispatch <| ClearCompleted) ]
                                 [ str "Clear completed" ] ] ] ] ] ] ]
 
-
-#if DEBUG
+open Elmish.React
 open Elmish.Debug
 open Elmish.HMR
-#endif
 
 Program.mkProgram init update view
 #if DEBUG
-|> Program.withConsoleTrace
 |> Program.withHMR
 #endif
-|> Program.withReact "elmish-app"
+|> Program.withReactUnoptimized "elmish-app"
 #if DEBUG
 |> Program.withDebugger
 #endif
