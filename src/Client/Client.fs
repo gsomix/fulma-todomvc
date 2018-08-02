@@ -28,6 +28,7 @@ type Msg =
     | EditNewTodoDescription of string
     | ToggleCompleted of Id
     | SetActiveTab of Tab
+    | ClearCompleted
 
 let init () : Model * Cmd<Msg> =
     let initialModel = 
@@ -72,12 +73,19 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
 
     | SetActiveTab tab -> 
         let newModel = { currentModel with ActiveTab = tab }
-        newModel, Cmd.none       
+        newModel, Cmd.none
+
+    | ClearCompleted -> 
+        let newItems = 
+            currentModel.TodoItems |> Map.filter (fun _ v -> not v.Completed)
+        let newModel = 
+            { currentModel with TodoItems = newItems }
+        newModel, Cmd.none     
 
 let showItems (items: Map<Id, Todo>) (dispatch: Msg -> unit) =
     [ for KeyValue(id, item) in items -> 
         Panel.block [ ] 
-            [ Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ] // TODO Use columns instead
+            [ Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ] // TODO Use columns instead?
                 [ Level.left [ ] 
                     [ Level.item [ ] 
                         [ Checkradio.checkbox // TODO Fix styling
@@ -114,7 +122,7 @@ let view (model: Model) (dispatch: Msg -> unit) =
         [ Column.column [ Column.Offset (Screen.All, Column.Is3)
                           Column.Width  (Screen.All, Column.Is6) ] 
             [ Panel.panel [ ] 
-                [ yield Panel.heading [ ] [ str "todos" ] 
+                [ yield Panel.heading [ ] [ str "Todos" ] 
                   yield Panel.block [ ] 
                     [ Control.div [ ] 
                         [ Input.text 
@@ -129,7 +137,13 @@ let view (model: Model) (dispatch: Msg -> unit) =
                       showTab Completed model.ActiveTab dispatch ] // TODO Fix code duplication
                   yield! showItems filtered dispatch
                   yield Panel.block [ ] 
-                    [ str (sprintf "%d items left" (countActive model.TodoItems)) ] ] ] ]
+                    [ Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ]
+                        [ Level.left [ ] 
+                            [ str (sprintf "%d items left" (countActive model.TodoItems)) ]
+                          Level.right [ ] 
+                            [ Button.button 
+                                [ Button.OnClick (fun _ -> dispatch <| ClearCompleted) ] 
+                                [ str "Clear completed" ] ] ] ] ] ] ]
 
 
 #if DEBUG
