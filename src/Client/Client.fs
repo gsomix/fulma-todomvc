@@ -13,10 +13,13 @@ open Fulma.Extensions
 
 let [<Literal>] ENTER_KEY = 13.
 
+type Tab = | All | Active | Completed
+
 type Model = { 
     TodoItems: Map<Id, Todo> 
     NewTodoDescription: string
     LastId: Id
+    ActiveTab: Tab
 }
 
 type Msg =
@@ -24,12 +27,14 @@ type Msg =
     | DeleteTodo of Id
     | EditNewTodoDescription of string
     | ToggleCompleted of Id
+    | SetActiveTab of Tab
 
 let init () : Model * Cmd<Msg> =
     let initialModel = 
         { TodoItems = Map.empty
           NewTodoDescription = "" 
-          LastId = 0 }
+          LastId = 0
+          ActiveTab = All }
     initialModel, Cmd.none
 
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
@@ -64,12 +69,15 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             { currentModel with 
                 TodoItems = currentModel.TodoItems |> Map.remove id }
         newModel, Cmd.none
-        
+
+    | SetActiveTab tab -> 
+        let newModel = { currentModel with ActiveTab = tab }
+        newModel, Cmd.none       
 
 let showItems (items: Map<Id, Todo>) (dispatch: Msg -> unit) =
     [ for KeyValue(id, item) in items -> 
         Panel.block [ ] 
-            [ Level.level [ ]
+            [ Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ] // TODO Use columns instead
                 [ Level.left [ ] 
                     [ Level.item [ ] 
                         [ Checkradio.checkbox // TODO Fix styling
@@ -82,12 +90,26 @@ let showItems (items: Map<Id, Todo>) (dispatch: Msg -> unit) =
                             [ Delete.OnClick (fun _ -> dispatch <| DeleteTodo id) ] [ ] ] ]
                 ] ] ]
 
+let filterItems (activeTab: Tab) (items: Map<Id, Todo>) =
+    match activeTab with
+    | All -> items
+    | Active -> items |> Map.filter (fun _ v -> not v.Completed)
+    | Completed -> items |> Map.filter (fun _ v -> v.Completed)
+
 let countActive (items: Map<Id, Todo>) =
     items
     |> Map.filter (fun _ v -> not v.Completed)
     |> Map.count
 
+let showTab (tab: Tab) (activeTab: Tab) (dispatch: Msg -> unit) =
+    Panel.tab 
+        [ Panel.Tab.IsActive (activeTab = tab)
+          Panel.Tab.Props [ OnClick (fun _ -> dispatch <| SetActiveTab tab) ] ] 
+        [ str (sprintf "%A" tab) ]
+
 let view (model: Model) (dispatch: Msg -> unit) =
+    let filtered = filterItems model.ActiveTab model.TodoItems
+
     Columns.columns [ ]
         [ Column.column [ Column.Offset (Screen.All, Column.Is3)
                           Column.Width  (Screen.All, Column.Is6) ] 
@@ -101,8 +123,13 @@ let view (model: Model) (dispatch: Msg -> unit) =
                               Input.Props 
                                 [ OnInput (fun e -> dispatch <| EditNewTodoDescription e.Value) 
                                   OnKeyDown (fun e -> if e.which = ENTER_KEY then dispatch <| AddTodo) ] ] ] ] 
-                  yield! showItems model.TodoItems dispatch
-                  yield Panel.block [ ] [ str (sprintf "%d items left" (countActive model.TodoItems)) ] ] ] ]
+                  yield Panel.tabs [ ] // TODO Move to component
+                    [ showTab All model.ActiveTab dispatch
+                      showTab Active model.ActiveTab dispatch
+                      showTab Completed model.ActiveTab dispatch ] // TODO Fix code duplication
+                  yield! showItems filtered dispatch
+                  yield Panel.block [ ] 
+                    [ str (sprintf "%d items left" (countActive model.TodoItems)) ] ] ] ]
 
 
 #if DEBUG
