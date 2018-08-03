@@ -117,56 +117,74 @@ module View =
 
     let [<Literal>] ENTER_KEY = 13.
 
-    let renderItem (dispatch: Msg -> unit) (item: Todo) =
+    let viewItem (item: Todo)
+                 (onToggle: Id -> unit)
+                 (onDelete: Id -> unit) =
         Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ]
             [ Level.left [ ]
                 [ Checkradio.checkbox [ Checkradio.Checked item.Completed
-                                        Checkradio.OnChange (fun _ -> dispatch <| ToggleCompleted item.Id) ]
+                                        Checkradio.OnChange (fun _ -> onToggle item.Id) ]
                     [ str item.Description ] ]
 
               Level.right [ ]
                 [ Delete.delete [ Delete.Modifiers [ Modifier.IsPulledRight ]
-                                  Delete.OnClick (fun _ -> dispatch <| DeleteTodo item.Id) ]
+                                  Delete.OnClick (fun _ -> onDelete item.Id) ]
                     [ ] ] ]
 
-    let renderItems (dispatch: Msg -> unit) (items: TodoList) =
-        [ for KeyValue(_, item) in items -> Panel.block [ ] [renderItem dispatch item] ]
+    let viewItems (items: TodoList)
+                  (onToggle: Id -> unit)
+                  (onDelete: Id -> unit) =
+        [ for KeyValue(_, item) in items ->
+            Panel.block [ ] [ viewItem item onToggle onDelete ] ]
 
-    let renderInput (dispatch: Msg -> unit) (placeholder: string) (value: string) =
+    let viewInput (placeholder: string)
+                  (value: string)
+                  (onInput: string -> unit)
+                  (onEnter: unit -> unit) =
         Control.div [ ]
             [ Input.text
                 [ Input.Placeholder placeholder
                   Input.Value value
                   Input.Props
-                    [ OnInput (fun e -> dispatch <| EditNewTodoDescription e.Value)
-                      OnKeyDown (fun e -> if e.which = ENTER_KEY then dispatch <| AddTodo) ] ] ]
+                    [ OnInput (fun e -> onInput e.Value)
+                      OnKeyDown (fun e -> if e.which = ENTER_KEY then onEnter ()) ] ] ]
 
-    let renderTab (tab: 'a) (activeTab: 'a) (onClick: MouseEvent -> unit) =
+    let viewTab (tab: 'a) (activeTab: 'a) (onClick: 'a -> unit) =
         Panel.tab [ Panel.Tab.IsActive (activeTab = tab)
-                    Panel.Tab.Props [ OnClick onClick ] ]
+                    Panel.Tab.Props [ OnClick (fun _ -> onClick tab) ] ]
             [ str (sprintf "%A" tab) ]
 
-    let renderTabs (tabs: List<'a>) (activeTab: 'a) (onClick: 'a -> MouseEvent -> unit) =
-        [ for tab in tabs -> renderTab tab activeTab (onClick tab) ]
+    let viewTabs (tabs: List<'a>) (activeTab: 'a) (onClick: 'a -> unit) =
+        [ for tab in tabs -> viewTab tab activeTab onClick ]
 
     let view (model: Model) (dispatch: Msg -> unit) =
         let filtered = TodoList.filterItems model.ActiveFilter model.TodoItems
 
-        let renderItems = renderItems dispatch
-        let renderInput = renderInput dispatch
+        let onItemToggleHandler = fun id -> dispatch (ToggleCompleted id)
+        let onItemDeleteHandler = fun id -> dispatch (DeleteTodo id)
+        let viewItems items =
+            viewItems items onItemToggleHandler onItemDeleteHandler
+
+        let onInputHandler = fun str -> dispatch (EditNewTodoDescription str)
+        let onEnterHandler = fun () -> dispatch (AddTodo)
+        let viewInput placeholder descr =
+            viewInput placeholder descr onInputHandler onEnterHandler
+
+        let onTabClickHandler = fun filter -> dispatch (ActivateFilter filter)
+        let viewTabs tabs activeTab =
+            viewTabs tabs activeTab onTabClickHandler
 
         Panel.panel [ ]
             [ yield Panel.heading [ ]
                 [ str "Todos" ]
 
               yield Panel.block [ ]
-                [ renderInput "What needs to be done?" model.NewTodoDescription ]
+                [ viewInput "What needs to be done?" model.NewTodoDescription ]
 
               yield Panel.tabs [ ]
-                [ yield! renderTabs [All; Active; Completed] model.ActiveFilter
-                            (fun filter _ -> dispatch <| ActivateFilter filter) ]
+                [ yield! viewTabs [All; Active; Completed] model.ActiveFilter ]
 
-              yield! renderItems filtered
+              yield! viewItems filtered
 
               yield Panel.block [ ]
                 [ Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ]
