@@ -16,18 +16,34 @@ module Types =
 
     type Filter = | All | Active | Completed
 
+    type Id = int
+
+    type TodoList = Map<Id, Todo>
+
+    module TodoList =
+        let filterItems (filter: Filter) (items: TodoList) =
+            match filter with
+            | All -> items
+            | Active -> items |> Map.filter (fun _ v -> not v.Completed)
+            | Completed -> items |> Map.filter (fun _ v -> v.Completed)
+
+        let countItems (filter: Filter) (items: TodoList) =
+            items
+            |> filterItems filter
+            |> Map.count
+
     type Model = {
-        TodoItems: Map<int, Todo>
+        TodoItems: TodoList
         NewTodoDescription: string
-        IdCounter: int
+        IdCounter: Id
         ActiveFilter: Filter
     }
 
     type Msg =
         // Operations on todo list
         | AddTodo
-        | DeleteTodo of int
-        | ToggleCompleted of int
+        | DeleteTodo of Id
+        | ToggleCompleted of Id
         | ClearCompleted
 
         // UI messages
@@ -101,17 +117,6 @@ module View =
 
     let [<Literal>] ENTER_KEY = 13.
 
-    let filterItems (items: Map<int, Todo>) (filter: Filter) =
-        match filter with
-        | All -> items
-        | Active -> items |> Map.filter (fun _ v -> not v.Completed)
-        | Completed -> items |> Map.filter (fun _ v -> v.Completed)
-
-    let countActive (items: Map<int, Todo>) =
-        items
-        |> Map.filter (fun _ v -> not v.Completed)
-        |> Map.count
-
     let renderItem (dispatch: Msg -> unit) (item: Todo) =
         Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ]
             [ Level.left [ ]
@@ -124,7 +129,7 @@ module View =
                                   Delete.OnClick (fun _ -> dispatch <| DeleteTodo item.Id) ]
                     [ ] ] ]
 
-    let renderItems (dispatch: Msg -> unit) (items: Map<int, Todo>) =
+    let renderItems (dispatch: Msg -> unit) (items: TodoList) =
         [ for KeyValue(_, item) in items -> Panel.block [ ] [renderItem dispatch item] ]
 
     let renderInput (dispatch: Msg -> unit) (placeholder: string) (value: string) =
@@ -145,7 +150,8 @@ module View =
         [ for tab in tabs -> renderTab tab activeTab (onClick tab) ]
 
     let view (model: Model) (dispatch: Msg -> unit) =
-        let filtered = filterItems model.TodoItems model.ActiveFilter
+        let filtered = TodoList.filterItems model.ActiveFilter model.TodoItems
+
         let renderItems = renderItems dispatch
         let renderInput = renderInput dispatch
 
@@ -165,7 +171,8 @@ module View =
               yield Panel.block [ ]
                 [ Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ]
                     [ Level.left [ ]
-                        [ Text.div [ ] [ str (sprintf "%d items left" (countActive model.TodoItems)) ] ]
+                        [ Text.div [ ]
+                            [ str (sprintf "%d items left" (TodoList.countItems Active model.TodoItems)) ] ]
 
                       Level.right [ ]
                         [ Button.button [ Button.Modifiers [ Modifier.IsPulledRight ]
