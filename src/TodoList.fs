@@ -144,7 +144,7 @@ module View =
     let renderTabs (tabs: List<'a>) (activeTab: 'a) (onClick: 'a -> MouseEvent -> unit) =
         [ for tab in tabs -> renderTab tab activeTab (onClick tab) ]
 
-    let renderPanel (model: Model) (dispatch: Msg -> unit) =
+    let view (model: Model) (dispatch: Msg -> unit) =
         let filtered = filterItems model.TodoItems model.ActiveFilter
         let renderItems = renderItems dispatch
         let renderInput = renderInput dispatch
@@ -172,11 +172,3 @@ module View =
                                           Button.Size IsSmall
                                           Button.OnClick (fun _ -> dispatch <| ClearCompleted) ]
                             [ str "Clear completed" ] ] ] ] ]
-
-    let view (model: Model) (dispatch: Msg -> unit) =
-        Hero.hero [ ]
-            [ Hero.body [ ]
-                [ Columns.columns [ ]
-                    [ Column.column [ Column.Width (Screen.All, Column.IsHalf)
-                                      Column.Offset (Screen.All, Column.IsOneQuarter) ]
-                        [ renderPanel model dispatch ] ] ] ]
