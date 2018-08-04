@@ -3,7 +3,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Shared.fs" />
+    <Compile Include="Storage.fs" />
     <Compile Include="TodoList.fs" />
     <Compile Include="App.fs" />
   </ItemGroup>

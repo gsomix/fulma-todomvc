@@ -1,6 +1,8 @@
 namespace TodoList
 
 module Types =
+    type Id = int
+
     type Todo = {
         Id: int
         Description: string
@@ -15,8 +17,6 @@ module Types =
         }
 
     type Filter = | All | Active | Completed
-
-    type Id = int
 
     type TodoList = Map<Id, Todo>
 
