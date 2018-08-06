@@ -47,12 +47,16 @@ module Types =
         NewTodoDescription: string
         IdCounter: Id
         ActiveFilter: Filter
+        EditingItem: Todo option
     }
 
     type Msg =
         // Operations on todo list
-        | AddTodo
-        | DeleteTodo of Id
+        | AddItem
+        | DeleteItem of Id
+        | StartEditItem of Id
+        | StopEditItem of Id
+        | UpdateItem of Id * string
         | ToggleCompleted of Id
         | ClearCompleted
 
@@ -70,12 +74,13 @@ module State =
             { TodoItems = Map.empty
               NewTodoDescription = ""
               IdCounter = 0
-              ActiveFilter = All }
+              ActiveFilter = All
+              EditingItem = None }
         initialModel, Cmd.none
 
     let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         match msg with
-        | AddTodo ->
+        | AddItem ->
             let id = currentModel.IdCounter + 1 // TODO Move computation to Id type
             let item =
                 { Todo.Empty with
@@ -88,11 +93,30 @@ module State =
                     IdCounter = id }
             model, Cmd.none
 
-        | DeleteTodo id ->
+        | DeleteItem id ->
             let model =
                 { currentModel with
                     TodoItems = currentModel.TodoItems |> Map.remove id }
             model, Cmd.none
+
+        | StartEditItem id ->
+            let model =
+                { currentModel with
+                    EditingItem = Map.tryFind id currentModel.TodoItems }
+            model, Cmd.none
+
+        | UpdateItem (_, str) ->
+            let item = currentModel.EditingItem |> Option.map (fun item -> { item with Description = str })
+            let model = { currentModel with EditingItem = item }
+            model, Cmd.none
+
+        | StopEditItem id ->
+            let model =
+                { currentModel with
+                    TodoItems = currentModel.TodoItems |> Map.add id currentModel.EditingItem.Value
+                    EditingItem = None }
+            model, Cmd.none
+
 
         | ToggleCompleted id ->
             let item = Map.find id currentModel.TodoItems
@@ -129,24 +153,44 @@ module View =
     let [<Literal>] ENTER_KEY = 13.
 
     let viewItem (item: Todo)
-                 (onToggle: Id -> unit)
-                 (onDelete: Id -> unit) =
+                 (isEditing: bool)
+                 (dispatch: Msg -> unit) =
+
+        let control =
+            if isEditing then
+                Input.text [ Input.Size Size.IsSmall
+                             Input.Value item.Description
+                             Input.Props [ OnBlur (fun _ -> StopEditItem item.Id |> dispatch)
+                                           OnInput (fun e -> (item.Id, e.Value) |> UpdateItem |> dispatch)
+                                           OnKeyDown (fun e -> if e.which = ENTER_KEY then StopEditItem item.Id |> dispatch)
+                                           AutoFocus true ] ]
+            else
+                Text.p [ Props [ OnDoubleClick (fun _ -> StartEditItem item.Id |> dispatch) ] ] [ str item.Description ]
+
         Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ]
             [ Level.left [ ]
-                [ Checkradio.checkbox [ Checkradio.Checked (Todo.isDone item)
-                                        Checkradio.OnChange (fun _ -> onToggle item.Id) ]
-                    [ str item.Description ] ]
+                [ Level.item [ ]
+                        [ Checkradio.checkbox [ Checkradio.Checked (Todo.isDone item)
+                                                Checkradio.OnChange (fun _ -> ToggleCompleted item.Id |> dispatch) ] [ ] ]
+                  Level.item [ ] [ control ] ]
 
               Level.right [ ]
                 [ Delete.delete [ Delete.Modifiers [ Modifier.IsPulledRight ]
-                                  Delete.OnClick (fun _ -> onDelete item.Id) ]
+                                  Delete.OnClick (fun _ -> DeleteItem item.Id |> dispatch) ]
                     [ ] ] ]
 
-    let viewItems (items: TodoList)
-                  (onToggle: Id -> unit)
-                  (onDelete: Id -> unit) =
+    let viewItems (model: Model) (dispatch: Msg -> unit) =
+        let items = model.TodoItems
         [ for KeyValue(_, item) in items ->
-            Panel.block [ ] [ viewItem item onToggle onDelete ] ]
+            let isEditing =
+                if model.EditingItem.IsNone then false
+                else item.Id = model.EditingItem.Value.Id
+            let item = if isEditing then
+                            model.EditingItem.Value
+                       else
+                            item
+
+            Panel.block [ ] [ viewItem item isEditing dispatch ] ]
 
     let viewInput (placeholder: string)
                   (value: string)
@@ -171,13 +215,11 @@ module View =
     let view (model: Model) (dispatch: Msg -> unit) =
         let filtered = TodoList.filterItems model.ActiveFilter model.TodoItems
 
-        let onItemToggleHandler = fun id -> dispatch (ToggleCompleted id)
-        let onItemDeleteHandler = fun id -> dispatch (DeleteTodo id)
-        let viewItems items =
-            viewItems items onItemToggleHandler onItemDeleteHandler
+        let viewItems model =
+            viewItems { model with TodoItems = filtered } dispatch
 
         let onInputHandler = fun str -> dispatch (EditNewTodoDescription str)
-        let onEnterHandler = fun () -> dispatch (AddTodo)
+        let onEnterHandler = fun () -> dispatch (AddItem)
         let viewInput placeholder descr =
             viewInput placeholder descr onInputHandler onEnterHandler
 
@@ -195,7 +237,7 @@ module View =
               yield Panel.tabs [ ]
                 [ yield! viewTabs [All; Active; Completed] model.ActiveFilter ]
 
-              yield! viewItems filtered
+              yield! viewItems model
 
               yield Panel.block [ ]
                 [ Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ]
