@@ -142,7 +142,7 @@ module View =
 
     let [<Literal>] ENTER_KEY = 13.
 
-    let plurarize count =
+    let pluralize count =
         if count = 1
         then sprintf "%d item" count
         else sprintf "%d items" count
