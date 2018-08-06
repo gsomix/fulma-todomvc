@@ -1,20 +1,30 @@
 namespace TodoList
 
-module Types =
+module Domain =
     type Id = int
+
+    type TodoStatus =
+        | TodoActive
+        | TodoCompleted
 
     type Todo = {
         Id: int
         Description: string
-        Completed: bool
+        Status: TodoStatus
     }
 
     module Todo =
         let Empty = {
             Id = 0
             Description = ""
-            Completed = false
+            Status = TodoActive
         }
+
+        let isDone todo =
+            todo.Status = TodoCompleted
+
+module Types =
+    open Domain
 
     type Filter = | All | Active | Completed
 
@@ -24,8 +34,8 @@ module Types =
         let filterItems (filter: Filter) (items: TodoList) =
             match filter with
             | All -> items
-            | Active -> items |> Map.filter (fun _ v -> not v.Completed)
-            | Completed -> items |> Map.filter (fun _ v -> v.Completed)
+            | Active -> items |> Map.filter (fun _ v -> not (Todo.isDone v))
+            | Completed -> items |> Map.filter (fun _ v -> Todo.isDone v)
 
         let countItems (filter: Filter) (items: TodoList) =
             items
@@ -52,6 +62,7 @@ module Types =
 
 module State =
     open Elmish
+    open Domain
     open Types
 
     let init () : Model * Cmd<Msg> =
@@ -85,7 +96,7 @@ module State =
 
         | ToggleCompleted id ->
             let item = Map.find id currentModel.TodoItems
-            let item = { item with Completed = not item.Completed }
+            let item = { item with Status = if Todo.isDone item then TodoActive else TodoCompleted }
             let model =
                 { currentModel with
                     TodoItems = currentModel.TodoItems |> Map.add id item }
@@ -93,7 +104,7 @@ module State =
 
         | ClearCompleted ->
             let item =
-                currentModel.TodoItems |> Map.filter (fun _ v -> not v.Completed)
+                currentModel.TodoItems |> Map.filter (fun _ v -> not (Todo.isDone v))
             let model =
                 { currentModel with TodoItems = item }
             model, Cmd.none
@@ -109,10 +120,10 @@ module State =
 module View =
     open Fable.Helpers.React
     open Fable.Helpers.React.Props
-    open Fable.Import.React
 
     open Fulma
     open Fulma.Extensions
+    open Domain
     open Types
 
     let [<Literal>] ENTER_KEY = 13.
@@ -122,7 +133,7 @@ module View =
                  (onDelete: Id -> unit) =
         Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ]
             [ Level.left [ ]
-                [ Checkradio.checkbox [ Checkradio.Checked item.Completed
+                [ Checkradio.checkbox [ Checkradio.Checked (Todo.isDone item)
                                         Checkradio.OnChange (fun _ -> onToggle item.Id) ]
                     [ str item.Description ] ]
 
