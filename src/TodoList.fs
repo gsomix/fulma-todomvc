@@ -6,36 +6,36 @@ module Domain =
     type TodoStatus =
         | TodoActive
         | TodoCompleted
+        with
+        member this.Swap =
+            match this with
+            | TodoActive -> TodoCompleted
+            | TodoCompleted -> TodoActive
 
     type Todo = {
-        Id: int
+        Id: Id
         Description: string
         Status: TodoStatus
-    }
-
-    module Todo =
-        let Empty = {
+    } with
+        member this.IsDone = this.Status = TodoCompleted
+        static member Empty = {
             Id = 0
             Description = ""
             Status = TodoActive
         }
 
-        let isDone todo =
-            todo.Status = TodoCompleted
-
 module Types =
     open Domain
 
     type Filter = | All | Active | Completed
-
     type TodoList = Map<Id, Todo>
 
     module TodoList =
         let filterItems (filter: Filter) (items: TodoList) =
             match filter with
             | All -> items
-            | Active -> items |> Map.filter (fun _ v -> not (Todo.isDone v))
-            | Completed -> items |> Map.filter (fun _ v -> Todo.isDone v)
+            | Active -> items |> Map.filter (fun _ item -> not item.IsDone)
+            | Completed -> items |> Map.filter (fun _ item -> item.IsDone)
 
         let countItems (filter: Filter) (items: TodoList) =
             items
@@ -44,7 +44,7 @@ module Types =
 
     type Model = {
         TodoItems: TodoList
-        NewTodoDescription: string
+        DescriptionField: string
         IdCounter: Id
         ActiveFilter: Filter
         EditingItem: Todo option
@@ -55,13 +55,13 @@ module Types =
         | AddItem
         | DeleteItem of Id
         | StartEditItem of Id
-        | StopEditItem of Id
-        | UpdateItem of Id * string
+        | StopEditItem
+        | UpdateEditingItem of string
         | ToggleCompleted of Id
         | ClearCompleted
 
         // UI messages
-        | EditNewTodoDescription of string
+        | DescriptionFieldInput of string
         | ActivateFilter of Filter
 
 module State =
@@ -72,74 +72,60 @@ module State =
     let init () : Model * Cmd<Msg> =
         let initialModel =
             { TodoItems = Map.empty
-              NewTodoDescription = ""
+              DescriptionField = ""
               IdCounter = 0
               ActiveFilter = All
               EditingItem = None }
         initialModel, Cmd.none
 
-    let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
+    let update (msg : Msg) (curModel : Model) : Model * Cmd<Msg> =
         match msg with
         | AddItem ->
-            let id = currentModel.IdCounter + 1 // TODO Move computation to Id type
-            let item =
-                { Todo.Empty with
-                    Id = id
-                    Description = currentModel.NewTodoDescription }
-            let model =
-                { currentModel with
-                    TodoItems = currentModel.TodoItems |> Map.add id item
-                    NewTodoDescription = ""
-                    IdCounter = id }
-            model, Cmd.none
+            let id = curModel.IdCounter + 1
+            let item = { Todo.Empty with Id = id; Description = curModel.DescriptionField }
+
+            { curModel with
+                TodoItems = curModel.TodoItems |> Map.add id item
+                DescriptionField = ""
+                IdCounter = id }, Cmd.none
 
         | DeleteItem id ->
-            let model =
-                { currentModel with
-                    TodoItems = currentModel.TodoItems |> Map.remove id }
-            model, Cmd.none
+            { curModel with TodoItems = curModel.TodoItems.Remove id }, Cmd.none
 
         | StartEditItem id ->
-            let model =
-                { currentModel with
-                    EditingItem = Map.tryFind id currentModel.TodoItems }
-            model, Cmd.none
+            { curModel with EditingItem = curModel.TodoItems.TryFind id }, Cmd.none
 
-        | UpdateItem (_, str) ->
-            let item = currentModel.EditingItem |> Option.map (fun item -> { item with Description = str })
-            let model = { currentModel with EditingItem = item }
-            model, Cmd.none
+        | UpdateEditingItem str ->
+            let item =
+                curModel.EditingItem
+                |> Option.map (fun item -> { item with Description = str })
+            { curModel with EditingItem = item }, Cmd.none
 
-        | StopEditItem id ->
-            let model =
-                { currentModel with
-                    TodoItems = currentModel.TodoItems |> Map.add id currentModel.EditingItem.Value
-                    EditingItem = None }
-            model, Cmd.none
-
+        | StopEditItem ->
+            let items =
+                curModel.EditingItem
+                |> Option.map (fun item -> curModel.TodoItems.Add (item.Id, item))
+            { curModel with
+                TodoItems = defaultArg items curModel.TodoItems
+                EditingItem = None }, Cmd.none
 
         | ToggleCompleted id ->
-            let item = Map.find id currentModel.TodoItems
-            let item = { item with Status = if Todo.isDone item then TodoActive else TodoCompleted }
-            let model =
-                { currentModel with
-                    TodoItems = currentModel.TodoItems |> Map.add id item }
-            model, Cmd.none
+            let items =
+                curModel.TodoItems.TryFind id
+                |> Option.map (fun item -> { item with Status = item.Status.Swap })
+                |> Option.map (fun item -> curModel.TodoItems.Add (id, item))
+            { curModel with
+                TodoItems = defaultArg items curModel.TodoItems}, Cmd.none
 
         | ClearCompleted ->
-            let item =
-                currentModel.TodoItems |> Map.filter (fun _ v -> not (Todo.isDone v))
-            let model =
-                { currentModel with TodoItems = item }
-            model, Cmd.none
+            let item = curModel.TodoItems |> Map.filter (fun _ item -> not item.IsDone)
+            { curModel with TodoItems = item }, Cmd.none
 
-        | EditNewTodoDescription str ->
-            let model = { currentModel with NewTodoDescription = str }
-            model, Cmd.none
+        | DescriptionFieldInput str ->
+            { curModel with DescriptionField = str }, Cmd.none
 
         | ActivateFilter tab ->
-            let model = { currentModel with ActiveFilter = tab }
-            model, Cmd.none
+            { curModel with ActiveFilter = tab }, Cmd.none
 
 module View =
     open Fable.Helpers.React
@@ -160,9 +146,9 @@ module View =
             if isEditing then
                 Input.text [ Input.Size Size.IsSmall
                              Input.Value item.Description
-                             Input.Props [ OnBlur (fun _ -> StopEditItem item.Id |> dispatch)
-                                           OnInput (fun e -> (item.Id, e.Value) |> UpdateItem |> dispatch)
-                                           OnKeyDown (fun e -> if e.which = ENTER_KEY then StopEditItem item.Id |> dispatch)
+                             Input.Props [ OnBlur (fun _ -> StopEditItem |> dispatch)
+                                           OnInput (fun e -> e.Value |> UpdateEditingItem |> dispatch)
+                                           OnKeyDown (fun e -> if e.which = ENTER_KEY then StopEditItem |> dispatch)
                                            AutoFocus true ] ]
             else
                 Text.p [ Props [ OnDoubleClick (fun _ -> StartEditItem item.Id |> dispatch) ] ] [ str item.Description ]
@@ -170,7 +156,7 @@ module View =
         Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ]
             [ Level.left [ ]
                 [ Level.item [ ]
-                        [ Checkradio.checkbox [ Checkradio.Checked (Todo.isDone item)
+                        [ Checkradio.checkbox [ Checkradio.Checked item.IsDone
                                                 Checkradio.OnChange (fun _ -> ToggleCompleted item.Id |> dispatch) ] [ ] ]
                   Level.item [ ] [ control ] ]
 
@@ -218,7 +204,7 @@ module View =
         let viewItems model =
             viewItems { model with TodoItems = filtered } dispatch
 
-        let onInputHandler = fun str -> dispatch (EditNewTodoDescription str)
+        let onInputHandler = fun str -> dispatch (DescriptionFieldInput str)
         let onEnterHandler = fun () -> dispatch (AddItem)
         let viewInput placeholder descr =
             viewInput placeholder descr onInputHandler onEnterHandler
@@ -232,7 +218,7 @@ module View =
                 [ str "Todos" ]
 
               yield Panel.block [ ]
-                [ viewInput "What needs to be done?" model.NewTodoDescription ]
+                [ viewInput "What needs to be done?" model.DescriptionField ]
 
               yield Panel.tabs [ ]
                 [ yield! viewTabs [All; Active; Completed] model.ActiveFilter ]
