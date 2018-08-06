@@ -12,15 +12,12 @@ type Model = {
 
 type Msg =
     | TodoListMsg of TodoList.Types.Msg
+    | LoadFromStorage
     | Failure of string
 
 let init () : Model * Cmd<Msg> =
-    let savedModel = Storage.load()
-    match savedModel with
-    | Some model -> model, Cmd.none
-    | None ->
-        let todoList, cmd = TodoList.State.init()
-        { TodoList = todoList }, Cmd.batch [ Cmd.map TodoListMsg cmd ]
+    let todoList, cmd = TodoList.State.init()
+    { TodoList = todoList }, Cmd.batch [ Cmd.map TodoListMsg cmd; Cmd.ofMsg LoadFromStorage ]
 
 let setStorage (model: Model) : Cmd<Msg> =
     Cmd.attemptFunc Storage.save model (fun exn -> Failure (string exn))
@@ -34,6 +31,13 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     | Failure err ->
         Fable.Import.Browser.console.error(err)
         currentModel, Cmd.none
+    | LoadFromStorage ->
+        let savedModel: Model option = Storage.load ()
+        let model =
+            match savedModel with
+            | Some model -> { currentModel with TodoList = model.TodoList }
+            | None -> currentModel
+        model, Cmd.none
 
 let updateWithStorage (msg: Msg) (currentModel: Model): Model * Cmd<Msg> =
     match msg with
