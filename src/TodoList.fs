@@ -81,13 +81,15 @@ module State =
     let update (msg : Msg) (curModel : Model) : Model * Cmd<Msg> =
         match msg with
         | AddItem ->
-            let id = curModel.IdCounter + 1
-            let item = { Todo.Empty with Id = id; Description = curModel.DescriptionField }
-
-            { curModel with
-                TodoItems = curModel.TodoItems |> Map.add id item
-                DescriptionField = ""
-                IdCounter = id }, Cmd.none
+            if curModel.DescriptionField = ""
+            then curModel, Cmd.none
+            else
+                let id = curModel.IdCounter + 1
+                let item = { Todo.Empty with Id = id; Description = curModel.DescriptionField }
+                { curModel with
+                    TodoItems = curModel.TodoItems |> Map.add id item
+                    DescriptionField = ""
+                    IdCounter = id }, Cmd.none
 
         | DeleteItem id ->
             { curModel with TodoItems = curModel.TodoItems.Remove id }, Cmd.none
@@ -104,7 +106,9 @@ module State =
         | StopEditItem ->
             let items =
                 curModel.EditingItem
-                |> Option.map (fun item -> curModel.TodoItems.Add (item.Id, item))
+                |> Option.map (fun item -> if item.Description = ""
+                                           then curModel.TodoItems.Remove item.Id
+                                           else curModel.TodoItems.Add (item.Id, item))
             { curModel with
                 TodoItems = defaultArg items curModel.TodoItems
                 EditingItem = None }, Cmd.none
@@ -130,109 +134,98 @@ module State =
 module View =
     open Fable.Helpers.React
     open Fable.Helpers.React.Props
-
     open Fulma
     open Fulma.Extensions
+
     open Domain
     open Types
 
     let [<Literal>] ENTER_KEY = 13.
 
-    let viewItem (item: Todo)
-                 (isEditing: bool)
-                 (dispatch: Msg -> unit) =
+    let plurarize count =
+        if count = 1
+        then sprintf "%d item" count
+        else sprintf "%d items" count
 
+    let viewItem (item: Todo) (isEditing: bool) (dispatch: Msg -> unit) =
         let control =
             if isEditing then
                 Input.text [ Input.Size Size.IsSmall
                              Input.Value item.Description
                              Input.Props [ OnBlur (fun _ -> StopEditItem |> dispatch)
-                                           OnInput (fun e -> e.Value |> UpdateEditingItem |> dispatch)
+                                           OnChange (fun e -> e.Value |> UpdateEditingItem |> dispatch)
                                            OnKeyDown (fun e -> if e.which = ENTER_KEY then StopEditItem |> dispatch)
                                            AutoFocus true ] ]
             else
-                Text.p [ Props [ OnDoubleClick (fun _ -> StartEditItem item.Id |> dispatch) ] ] [ str item.Description ]
+                Text.p
+                    [ Props [ OnDoubleClick (fun _ -> StartEditItem item.Id |> dispatch) ]
+                      Modifiers [ (if item.Status = TodoCompleted
+                                   then Modifier.TextColor Color.IsGreyLight
+                                   else Modifier.TextColor Color.IsBlack) ] ]
+                    [ str item.Description ]
 
         Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ]
             [ Level.left [ ]
                 [ Level.item [ ]
-                        [ Checkradio.checkbox [ Checkradio.Checked item.IsDone
-                                                Checkradio.OnChange (fun _ -> ToggleCompleted item.Id |> dispatch) ] [ ] ]
-                  Level.item [ ] [ control ] ]
+                    [ Checkradio.checkbox
+                        [ Checkradio.Checked item.IsDone
+                          Checkradio.OnChange (fun _ -> ToggleCompleted item.Id |> dispatch) ] [ ] ]
+                  Level.item [ ]
+                    [ control ] ]
 
               Level.right [ ]
-                [ Delete.delete [ Delete.Modifiers [ Modifier.IsPulledRight ]
-                                  Delete.OnClick (fun _ -> DeleteItem item.Id |> dispatch) ]
-                    [ ] ] ]
+                [ Delete.delete
+                    [ Delete.Modifiers [ Modifier.IsPulledRight ]
+                      Delete.OnClick (fun _ -> DeleteItem item.Id |> dispatch) ] [ ] ] ]
 
     let viewItems (model: Model) (dispatch: Msg -> unit) =
-        let items = model.TodoItems
-        [ for KeyValue(_, item) in items ->
-            let isEditing =
-                if model.EditingItem.IsNone then false
-                else item.Id = model.EditingItem.Value.Id
-            let item = if isEditing then
-                            model.EditingItem.Value
-                       else
-                            item
+        [ for KeyValue(_, item) in model.TodoItems ->
+            match model.EditingItem with
+            | Some edtItem when edtItem.Id = item.Id ->
+                Panel.block [ ] [ viewItem edtItem true dispatch ]
+            | _ ->
+                Panel.block [ ] [ viewItem item false dispatch ] ]
 
-            Panel.block [ ] [ viewItem item isEditing dispatch ] ]
+    let viewInput (placeholder: string) (value: string) (dispatch: Msg -> unit) =
+        Input.text
+            [ Input.Placeholder placeholder
+              Input.Value value
+              Input.Props
+                [ OnChange (fun field -> DescriptionFieldInput field.Value |> dispatch)
+                  OnKeyDown (fun e -> if e.which = ENTER_KEY then AddItem |> dispatch) ] ]
 
-    let viewInput (placeholder: string)
-                  (value: string)
-                  (onInput: string -> unit)
-                  (onEnter: unit -> unit) =
-        Control.div [ ]
-            [ Input.text
-                [ Input.Placeholder placeholder
-                  Input.Value value
-                  Input.Props
-                    [ OnInput (fun e -> onInput e.Value)
-                      OnKeyDown (fun e -> if e.which = ENTER_KEY then onEnter ()) ] ] ]
-
-    let viewTab (tab: 'a) (activeTab: 'a) (onClick: 'a -> unit) =
-        Panel.tab [ Panel.Tab.IsActive (activeTab = tab)
-                    Panel.Tab.Props [ OnClick (fun _ -> onClick tab) ] ]
+    let viewTab (tab: Filter) (activeTab: Filter) (dispatch: Msg -> unit) =
+        Panel.tab
+            [ Panel.Tab.IsActive (activeTab = tab)
+              Panel.Tab.Props [ OnClick (fun _ -> ActivateFilter tab |> dispatch) ] ]
             [ str (sprintf "%A" tab) ]
 
-    let viewTabs (tabs: List<'a>) (activeTab: 'a) (onClick: 'a -> unit) =
-        [ for tab in tabs -> viewTab tab activeTab onClick ]
+    let viewTabs (tabs: List<Filter>) (activeTab: Filter) (dispatch: Msg -> unit) =
+        [ for tab in tabs -> viewTab tab activeTab dispatch ]
 
     let view (model: Model) (dispatch: Msg -> unit) =
         let filtered = TodoList.filterItems model.ActiveFilter model.TodoItems
-
-        let viewItems model =
-            viewItems { model with TodoItems = filtered } dispatch
-
-        let onInputHandler = fun str -> dispatch (DescriptionFieldInput str)
-        let onEnterHandler = fun () -> dispatch (AddItem)
-        let viewInput placeholder descr =
-            viewInput placeholder descr onInputHandler onEnterHandler
-
-        let onTabClickHandler = fun filter -> dispatch (ActivateFilter filter)
-        let viewTabs tabs activeTab =
-            viewTabs tabs activeTab onTabClickHandler
-
         Panel.panel [ ]
             [ yield Panel.heading [ ]
                 [ str "Todos" ]
 
               yield Panel.block [ ]
-                [ viewInput "What needs to be done?" model.DescriptionField ]
+                [ viewInput "What needs to be done?" model.DescriptionField dispatch ]
 
               yield Panel.tabs [ ]
-                [ yield! viewTabs [All; Active; Completed] model.ActiveFilter ]
+                [ yield! viewTabs [All; Active; Completed] model.ActiveFilter dispatch ]
 
-              yield! viewItems model
+              yield! viewItems { model with TodoItems = filtered } dispatch
 
               yield Panel.block [ ]
                 [ Level.level [ Level.Level.Props [ Style [ Flex "auto" ] ] ]
                     [ Level.left [ ]
                         [ Text.div [ ]
-                            [ str (sprintf "%d items left" (TodoList.countItems Active model.TodoItems)) ] ]
+                            [ str (sprintf "%s left" (plurarize (model.TodoItems |> TodoList.countItems Active))) ] ]
 
                       Level.right [ ]
                         [ Button.button [ Button.Modifiers [ Modifier.IsPulledRight ]
                                           Button.Size IsSmall
-                                          Button.OnClick (fun _ -> dispatch <| ClearCompleted) ]
+                                          Button.Disabled (model.TodoItems |> TodoList.countItems Completed = 0)
+                                          Button.OnClick (fun _ -> ClearCompleted |> dispatch) ]
                             [ str "Clear completed" ] ] ] ] ]
