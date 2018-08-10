@@ -47,6 +47,9 @@ module Types =
         let countEntries (filter: Filter) (entries: TodoList) =
             entries |> filterEntries filter |> Map.count
 
+        let areAllChecked (entries: TodoList) =
+            entries |> Map.forall (fun _ entry -> entry.Status = Todo.Completed)
+
     type Model =
         { Entries: TodoList
           Counter: Id
@@ -61,6 +64,7 @@ module Types =
         | Delete of Id
         | DeleteComplete
         | Check of Id
+        | CheckAll
 
         // Entry editing
         | StartEditEntry of Id
@@ -113,6 +117,15 @@ module State =
                     let entry = { entry with Status = entry.Status.Toggle }
                     model.Entries.Add (id, entry))
             { model with Entries = defaultArg entries model.Entries }, Cmd.none
+
+        | CheckAll ->
+            let areAllChecked = TodoList.areAllChecked model.Entries
+            let entries =
+                model.Entries
+                |> Map.map (fun _ entry ->
+                    { entry with
+                        Status = if areAllChecked then Todo.Active else Todo.Completed })
+            { model with Entries = entries }, Cmd.none
 
         | StartEditEntry id ->
             { model with EditingEntry = model.Entries.TryFind id }, Cmd.none
@@ -180,7 +193,7 @@ module View =
                   Columns.Props [ Style [ Flex "auto" ] ]
                 ]
                 [ Column.column
-                    [ Column.Width (Screen.All, Column.IsNarrow) ]
+                    [ Column.Width (Screen.All, Column.Is1) ]
                     [ Checkradio.checkbox
                         [ Checkradio.Checked (Todo.isDone entry)
                           Checkradio.OnChange (fun _ -> Check entry.Id |> dispatch)
@@ -207,14 +220,30 @@ module View =
                     Panel.block [ ] [ viewEntry entry false ]
             ]
 
-        let viewInput placeholder value =
+        let viewInput placeholder value entries =
             Panel.block [ ]
-                [ Input.text
-                    [ Input.Placeholder placeholder
-                      Input.Value value
-                      Input.Props
-                        [ OnChange  (fun field -> UpdateField field.Value |> dispatch)
-                          OnKeyDown (fun key -> if key.which = ENTER_KEY then Add |> dispatch)
+                [ Columns.columns
+                    [ Columns.IsVCentered
+                      Columns.IsMobile
+                      Columns.Props [ Style [ Flex "auto" ] ]
+                    ]
+                    [ Column.column
+                        [ Column.Width (Screen.All, Column.Is1) ]
+                        [ Checkradio.checkbox
+                            [ Checkradio.Checked (TodoList.areAllChecked entries)
+                              Checkradio.OnChange (fun _ -> CheckAll |> dispatch)
+                            ]
+                            [ ]
+                        ]
+                      Column.column [ ]
+                        [ Input.text
+                            [ Input.Placeholder placeholder
+                              Input.Value value
+                              Input.Props
+                                [ OnChange  (fun field -> UpdateField field.Value |> dispatch)
+                                  OnKeyDown (fun key -> if key.which = ENTER_KEY then Add |> dispatch)
+                                ]
+                            ]
                         ]
                     ]
                 ]
@@ -261,7 +290,7 @@ module View =
 
         Panel.panel [ ]
             [ yield  viewHeading "Todos"
-              yield  viewInput "What needs to be done?" model.Field
+              yield  viewInput "What needs to be done?" model.Field model.Entries
               yield  viewTabs [All; Active; Completed] model.Filter
               yield! viewEntries filtered model.EditingEntry
               yield  viewControls
