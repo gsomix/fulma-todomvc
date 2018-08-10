@@ -230,7 +230,7 @@ module View =
                     [ Column.column
                         [ Column.Width (Screen.All, Column.Is1) ]
                         [ Checkradio.checkbox
-                            [ Checkradio.Checked (TodoList.areAllChecked entries)
+                            [ Checkradio.Checked (TodoList.areAllChecked entries && not entries.IsEmpty)
                               Checkradio.OnChange (fun _ -> CheckAll |> dispatch)
                             ]
                             [ ]
