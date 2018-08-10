@@ -3,7 +3,7 @@ module Storage
 open Fable.Core
 open Fable.Import
 
-let private STORAGE_KEY = "todo-list"
+let [<Literal>] private STORAGE_KEY = "todo-list"
 
 let [<PassGenericsAttribute>] load<'T> (): 'T option =
     Browser.localStorage.getItem(STORAGE_KEY)

@@ -62,12 +62,12 @@ module Types =
         | DeleteComplete
         | Check of Id
 
-        // Editing
+        // Entry editing
         | StartEditEntry of Id
         | StopEditEntry
         | UpdateEditingEntry of string
 
-        // UI messages
+        // Other UI messages
         | UpdateField of string
         | ChangeFilter of Filter
 
@@ -174,26 +174,26 @@ module View =
                     [ Modifiers [ Modifier.TextColor (color entry.Status) ] ]
                     [ str entry.Description ]
 
-            Level.level
-                [ Level.Level.Props [ Style [ Flex "auto" ] ]
-                  Level.Level.IsMobile
+            Columns.columns
+                [ Columns.IsMobile
+                  Columns.IsVCentered
+                  Columns.Props [ Style [ Flex "auto" ] ]
                 ]
-                [ Level.left [ ]
-                    [ Level.item [ ]
-                        [ Checkradio.checkbox
-                            [ Checkradio.Checked (Todo.isDone entry)
-                              Checkradio.OnChange (fun _ -> Check entry.Id |> dispatch)
-                            ]
-                            [ ]
+                [ Column.column
+                    [ Column.Width (Screen.All, Column.IsNarrow) ]
+                    [ Checkradio.checkbox
+                        [ Checkradio.Checked (Todo.isDone entry)
+                          Checkradio.OnChange (fun _ -> Check entry.Id |> dispatch)
                         ]
-                      Level.item [ ] [ (if isEditing then input else description) ]
+                        [ ]
                     ]
-
-                  Level.right [ ]
+                  Column.column
+                    [ Column.Props [ OnDoubleClick (fun _ -> StartEditEntry entry.Id |> dispatch) ] ]
+                    [ (if isEditing then input else description) ]
+                  Column.column
+                    [ Column.Width (Screen.All, Column.IsNarrow) ]
                     [ Delete.delete
-                        [ Delete.Modifiers [ Modifier.IsPulledRight ]
-                          Delete.OnClick (fun _ -> Delete entry.Id |> dispatch)
-                        ]
+                        [ Delete.OnClick (fun _ -> Delete entry.Id |> dispatch) ]
                         [ ]
                     ]
                 ]
@@ -204,9 +204,7 @@ module View =
                 | Some editingEntry when editingEntry.Id = entry.Id ->
                     Panel.block [ ] [ viewEntry editingEntry true ]
                 | _ ->
-                    Panel.block
-                        [ Panel.Block.Props [OnDoubleClick (fun _ -> StartEditEntry entry.Id |> dispatch)] ]
-                        [ viewEntry entry false ]
+                    Panel.block [ ] [ viewEntry entry false ]
             ]
 
         let viewInput placeholder value =
@@ -245,7 +243,6 @@ module View =
                     ]
                     [ Level.left [ ]
                         [ Text.p [ ] [ str (sprintf "%s left" (pluralize activeEntries)) ] ]
-
                       Level.right [ ]
                         [ Button.button
                             [ Button.Modifiers [ Modifier.IsPulledRight ]
