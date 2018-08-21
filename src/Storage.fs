@@ -5,7 +5,7 @@ open Fable.Import
 
 let [<Literal>] private STORAGE_KEY = "todo-list"
 
-let [<PassGenericsAttribute>] load<'T> (): 'T option =
+let [<PassGenerics>] load<'T> (): 'T option =
     Browser.localStorage.getItem(STORAGE_KEY)
     |> unbox
     |> Core.Option.map (JsInterop.ofJson)
