@@ -45,7 +45,8 @@ module Types =
             | Completed -> entries |> Map.filterValues Todo.isDone
 
         let countEntries (filter: Filter) (entries: TodoList) =
-            entries |> filterEntries filter |> Map.count
+            let entries = entries |> filterEntries filter
+            entries.Count
 
         let areAllChecked (entries: TodoList) =
             entries |> Map.forall (fun _ entry -> entry.Status = Todo.Completed)

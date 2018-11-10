@@ -1,3 +1,4 @@
+.DS_Store
 packages/
 paket-files/
 paket.local
@@ -9,3 +10,4 @@ bin/
 output/
 .fake/
 temp/
+.ionide/
