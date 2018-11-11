@@ -33,13 +33,13 @@ module.exports = {
         {
             demo: [
                 "@babel/polyfill",
-                './src/fulma-todo-list.fsproj',
+                './src/fulma-todomvc.fsproj',
                 './src/scss/main.scss'
             ]
         } : {
             app: [
                 "@babel/polyfill",
-                './src/fulma-todo-list.fsproj'
+                './src/fulma-todomvc.fsproj'
             ],
             style: [
                 './src/scss/main.scss'

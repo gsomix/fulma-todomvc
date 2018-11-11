@@ -55,7 +55,7 @@ module Page =
                     [ Heading.h2 [ ]
                             [ str "Functional TodoMVC" ]
                       Heading.h3 [ Heading.IsSubtitle ]
-                            [ str "TodoMVC implemented in F#, using Fable, Elmish and Fulma for rendering." ]
+                            [ str "The TodoMVC app written in F#, using Fable, Elmish and Fulma" ]
                     ]
                   Column.column
                     [ Column.Width (Screen.All, Column.Is4)

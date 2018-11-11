@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26124.0
 MinimumVisualStudioVersion = 15.0.26124.0
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "fulma-todo-list", "src\fulma-todo-list.fsproj", "{7F06211F-4CDA-4C9D-8889-2BD60372903A}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "fulma-todo-mvc", "src\fulma-todomvc.fsproj", "{7F06211F-4CDA-4C9D-8889-2BD60372903A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

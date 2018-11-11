@@ -1,6 +1,6 @@
-# Functional TodoMVC
+# Functional TodoMVC - [Try It!](https://gsomix.github.io/fulma-todomvc/)
 
-TodoMVC implemented in F# using [Fable](http://fable.io/), [Elmish](https://fable-elmish.github.io/) and [Fulma](https://mangelmaxime.github.io/Fulma/).
+The TodoMVC app written in F#, using [Fable](http://fable.io/), [Elmish](https://fable-elmish.github.io/) and [Fulma](https://mangelmaxime.github.io/Fulma/).
 
 ## How to use ?
 

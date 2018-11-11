@@ -20,7 +20,7 @@ Target.create "Clean" (fun _ ->
 Target.create "Install" (fun _ ->
     DotNet.restore
         (DotNet.Options.withWorkingDirectory __SOURCE_DIRECTORY__)
-        "fulma-todo-list.sln"
+        "fulma-todomvc.sln"
 )
 
 Target.create "YarnInstall" (fun _ ->
