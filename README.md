@@ -1,17 +1,8 @@
-# Fulma minimal template
+# Functional TodoMVC
 
-This template setup a minimal application using [Fable](http://fable.io/), [Elmish](https://fable-elmish.github.io/) and [Fulma](https://mangelmaxime.github.io/Fulma/).
+TodoMVC implemented in F# using [Fable](http://fable.io/), [Elmish](https://fable-elmish.github.io/) and [Fulma](https://mangelmaxime.github.io/Fulma/).
 
 ## How to use ?
-
-### Architecture
-
-- Entry point of your application is `src/App.fs`
-- We are using [hmtl-webpack-plugin](https://github.com/jantimon/html-webpack-plugin) to make `src/index.html` the entry point of the website
-- Entry point of your style is `src/scss/main.scss`
-    - [Bulma](https://bulma.io/) and [Font Awesome](https://fontawesome.com/) are already included
-    - We are supporting both `scss` and `sass` (by default we use `scss`)
-- Static assets (favicon, images, etc.) should be placed in the `static` folder
 
 ### In development mode
 
